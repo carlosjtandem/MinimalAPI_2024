@@ -1,0 +1,6 @@
+@MinimalAPI_NetCore8_2024_HostAddress = http://localhost:5177
+
+GET {{MinimalAPI_NetCore8_2024_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
