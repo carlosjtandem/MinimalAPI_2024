@@ -6,6 +6,8 @@ using MinimalAPI_NetCore8_2024.Datos;
 using MinimalAPI_NetCore8_2024.Mapper;
 using MinimalAPI_NetCore8_2024.Modelo;
 using MinimalAPI_NetCore8_2024.Modelo.Dto;
+using System.ComponentModel;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,42 +34,48 @@ if (app.Environment.IsDevelopment())
 //GET all
 app.MapGet("/api/propiedades", (ILogger<Program> logger) =>
 {
-    //Usarr le _logger como inyeccion de dependencias
-    logger.Log(LogLevel.Information, "Carga todas las propiedades - esto es Log");
+    RespuestasAPI respuesta = new();
 
-    return Results.Ok(DatosPropiedad.listaPropiedades);
-}).WithName("ObtenerPropiedades").Produces<IEnumerable<Propiedad>>(200);
+    //Usarr le _logger como inyeccion de dependencias
+    logger.Log(LogLevel.Information, "Carga todas las propiedades - esto es Log por inyeccion de dependencias");
+
+    respuesta.Resultado = DatosPropiedad.listaPropiedades;
+    respuesta.Success = true;
+    respuesta.codigoEstado = HttpStatusCode.OK;
+
+    return Results.Ok(respuesta);
+}).WithName("ObtenerPropiedades").Produces<RespuestasAPI>(200);
 
 //GET  by id
 app.MapGet("/api/propiedades/{id:int}", (int id) =>
 {
-    return Results.Ok(DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.IdPropiedad == id));
-}).WithName("ObtenerPropiedad").Produces<Propiedad>(200);
+    RespuestasAPI respuesta = new();
+    respuesta.Resultado = DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.IdPropiedad == id);
+    respuesta.Success = true;
+    respuesta.codigoEstado = HttpStatusCode.OK;
+
+    return Results.Ok(respuesta);
+}).WithName("ObtenerPropiedad").Produces<RespuestasAPI>(200);
 
 //CREAR propiedad
-app.MapPost("/api/propiedades", (IMapper _mapper, IValidator<CrearPropiedadDto> _validacion, [FromBody] CrearPropiedadDto crearPropiedadDto) => // En vez de exponer el modelo se expone el DTO
+app.MapPost("/api/propiedades", async (IMapper _mapper, IValidator<CrearPropiedadDto> _validacion, [FromBody] CrearPropiedadDto crearPropiedadDto) => // En vez de exponer el modelo se expone el DTO
 {
-    var resultadoValidaciones = _validacion.ValidateAsync(crearPropiedadDto).GetAwaiter().GetResult();
-    
-    
+    RespuestasAPI respuesta = new();
+
+    var resultadoValidaciones = await _validacion.ValidateAsync(crearPropiedadDto);
+
     if (!resultadoValidaciones.IsValid)
     {
-        return Results.BadRequest(resultadoValidaciones.Errors.FirstOrDefault().ToString());
+        respuesta.Errores.Add(resultadoValidaciones.Errors.FirstOrDefault().ToString());
+        return Results.BadRequest(respuesta);
     }
 
     //validacion si el nombre ya existe
     if (DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.Nombre.ToLower() == crearPropiedadDto.Nombre.ToLower()) != null)
     {
-        return Results.BadRequest("El nombre ingresado ya existe");
+        respuesta.Errores.Add("El nombre ingresado ya existe");
+        return Results.BadRequest(respuesta);
     }
-
-    //Propiedad propiedad = new Propiedad()  // Convertimos a propiedad(modelo) desde PropiedadDto ya que para asignar el Id solo lo tenemos en el modelo.
-    //{
-    //    Nombre = crearPropiedadDto.Nombre,
-    //    Descripcion = crearPropiedadDto.Descripcion,
-    //    Ubicacion = crearPropiedadDto.Ubicacion,
-    //    Activa = crearPropiedadDto.Activa
-    //};
 
     Propiedad propiedad = _mapper.Map<Propiedad>(crearPropiedadDto);
 
@@ -75,21 +83,18 @@ app.MapPost("/api/propiedades", (IMapper _mapper, IValidator<CrearPropiedadDto> 
 
     DatosPropiedad.listaPropiedades.Add(propiedad);
 
-    //PropiedadDto propiedadDto = new PropiedadDto()
-    //{
-    //    IdPropiedad = propiedad.IdPropiedad,
-    //    Nombre = propiedad.Nombre,
-    //    Descripcion = propiedad.Descripcion,
-    //    Ubicacion = propiedad.Ubicacion,
-    //    Activa = propiedad.Activa
-    //};
-
     PropiedadDto propiedadDto = _mapper.Map<PropiedadDto>(propiedad);
 
 
-    return Results.CreatedAtRoute("ObtenerPropiedad", new { id = propiedad.IdPropiedad }, propiedadDto);  // retorna ruta completa.  location: https://localhost:7200/api/propiedades/6 
+    //return Results.CreatedAtRoute("ObtenerPropiedad", new { id = propiedad.IdPropiedad }, propiedadDto);  // retorna ruta completa.  location: https://localhost:7200/api/propiedades/6 
 
-}).WithName("CrearPropiedad").Accepts<CrearPropiedadDto>("application/json").Produces<PropiedadDto>(201).Produces<PropiedadDto>(400);
+    respuesta.Resultado = propiedadDto;
+    respuesta.Success = true;
+    respuesta.codigoEstado = HttpStatusCode.Created;
+
+    return Results.Ok(respuesta);
+
+}).WithName("CrearPropiedad").Accepts<CrearPropiedadDto>("application/json").Produces<RespuestasAPI>(201).Produces<PropiedadDto>(400);
 
 //
 app.UseHttpsRedirection();
