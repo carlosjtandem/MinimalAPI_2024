@@ -20,15 +20,19 @@ if (app.Environment.IsDevelopment())
 }
 
 //GET all
-app.MapGet("/api/propiedades", () =>
+app.MapGet("/api/propiedades", (ILogger<Program> logger) =>
 {
+    //Usarr le _logger como inyeccion de dependencias
+    logger.Log(LogLevel.Information, "Carga todas las propiedades - esto es Log");
+
     return Results.Ok(DatosPropiedad.listaPropiedades);
-});
+}).WithName("ObtenerPropiedades");
+
 //GET  by id
 app.MapGet("/api/propiedades/{id:int}", (int id) =>
 {
     return Results.Ok(DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.IdPropiedad == id));
-});
+}).WithName("ObtenerPropiedad");
 
 //CREAR propiedad
 app.MapPost("/api/propiedades", ([FromBody] Propiedad propiedad) =>
@@ -48,8 +52,11 @@ app.MapPost("/api/propiedades", ([FromBody] Propiedad propiedad) =>
 
     DatosPropiedad.listaPropiedades.Add(propiedad);
 
-    return Results.Ok(DatosPropiedad.listaPropiedades);
-});
+    //return Results.Ok(DatosPropiedad.listaPropiedades);// forma 1 // retorna 200 pero eso no es lo correcto porque 200 es para get
+    //return Results.Created($"/api/propiedades/{propiedad.IdPropiedad}", propiedad); // forma 2  // retorna location: /api/propiedades/6
+    return Results.CreatedAtRoute("ObtenerPropiedad", new { id = propiedad.IdPropiedad }, propiedad);  // retorna ruta completa.  location: https://localhost:7200/api/propiedades/6 
+
+}).WithName("CrearPropiedad");
 
 //
 app.UseHttpsRedirection();
