@@ -1,6 +1,8 @@
+using AutoMapper;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using MinimalAPI_NetCore8_2024.Datos;
+using MinimalAPI_NetCore8_2024.Mapper;
 using MinimalAPI_NetCore8_2024.Modelo;
 using MinimalAPI_NetCore8_2024.Modelo.Dto;
 
@@ -10,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+//Añadir Automapper
+builder.Services.AddAutoMapper(typeof(ConfigurationMapper));
 
 var app = builder.Build();
 
@@ -36,7 +41,7 @@ app.MapGet("/api/propiedades/{id:int}", (int id) =>
 }).WithName("ObtenerPropiedad").Produces<Propiedad>(200);
 
 //CREAR propiedad
-app.MapPost("/api/propiedades", ([FromBody] CrearPropiedadDto crearPropiedadDto) => // En vez de exponer el modelo se expone el DTO
+app.MapPost("/api/propiedades", (IMapper _mapper, [FromBody] CrearPropiedadDto crearPropiedadDto) => // En vez de exponer el modelo se expone el DTO
 {
     if (string.IsNullOrEmpty(crearPropiedadDto.Nombre))
     {
@@ -49,26 +54,31 @@ app.MapPost("/api/propiedades", ([FromBody] CrearPropiedadDto crearPropiedadDto)
         return Results.BadRequest("El nombre ingresado ya existe");
     }
 
-    Propiedad propiedad = new Propiedad()  // Convertimos a propiedad(modelo) desde PropiedadDto ya que para asignar el Id solo lo tenemos en el modelo.
-    {
-        Nombre = crearPropiedadDto.Nombre,
-        Descripcion = crearPropiedadDto.Descripcion,
-        Ubicacion = crearPropiedadDto.Ubicacion,
-        Activa = crearPropiedadDto.Activa
-    };
+    //Propiedad propiedad = new Propiedad()  // Convertimos a propiedad(modelo) desde PropiedadDto ya que para asignar el Id solo lo tenemos en el modelo.
+    //{
+    //    Nombre = crearPropiedadDto.Nombre,
+    //    Descripcion = crearPropiedadDto.Descripcion,
+    //    Ubicacion = crearPropiedadDto.Ubicacion,
+    //    Activa = crearPropiedadDto.Activa
+    //};
+
+    Propiedad propiedad = _mapper.Map<Propiedad>(crearPropiedadDto);
 
     propiedad.IdPropiedad = DatosPropiedad.listaPropiedades.OrderByDescending(p => p.IdPropiedad).FirstOrDefault().IdPropiedad + 1;  // Obtiene el ultimo id y suma 1
 
     DatosPropiedad.listaPropiedades.Add(propiedad);
 
-    PropiedadDto propiedadDto = new PropiedadDto()
-    {
-        IdPropiedad = propiedad.IdPropiedad,
-        Nombre = propiedad.Nombre,
-        Descripcion = propiedad.Descripcion,
-        Ubicacion = propiedad.Ubicacion,
-        Activa = propiedad.Activa
-    };
+    //PropiedadDto propiedadDto = new PropiedadDto()
+    //{
+    //    IdPropiedad = propiedad.IdPropiedad,
+    //    Nombre = propiedad.Nombre,
+    //    Descripcion = propiedad.Descripcion,
+    //    Ubicacion = propiedad.Ubicacion,
+    //    Activa = propiedad.Activa
+    //};
+
+    PropiedadDto propiedadDto = _mapper.Map<PropiedadDto>(propiedad);
+
 
     return Results.CreatedAtRoute("ObtenerPropiedad", new { id = propiedad.IdPropiedad }, propiedadDto);  // retorna ruta completa.  location: https://localhost:7200/api/propiedades/6 
 
