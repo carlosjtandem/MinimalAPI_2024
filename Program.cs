@@ -1,4 +1,5 @@
 using AutoMapper;
+using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using MinimalAPI_NetCore8_2024.Datos;
@@ -15,6 +16,9 @@ builder.Services.AddSwaggerGen();
 
 //Añadir Automapper
 builder.Services.AddAutoMapper(typeof(ConfigurationMapper));
+
+//Añadir  Fluent Validation al contendero de servicios
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 var app = builder.Build();
 
@@ -41,11 +45,14 @@ app.MapGet("/api/propiedades/{id:int}", (int id) =>
 }).WithName("ObtenerPropiedad").Produces<Propiedad>(200);
 
 //CREAR propiedad
-app.MapPost("/api/propiedades", (IMapper _mapper, [FromBody] CrearPropiedadDto crearPropiedadDto) => // En vez de exponer el modelo se expone el DTO
+app.MapPost("/api/propiedades", (IMapper _mapper, IValidator<CrearPropiedadDto> _validacion, [FromBody] CrearPropiedadDto crearPropiedadDto) => // En vez de exponer el modelo se expone el DTO
 {
-    if (string.IsNullOrEmpty(crearPropiedadDto.Nombre))
+    var resultadoValidaciones = _validacion.ValidateAsync(crearPropiedadDto).GetAwaiter().GetResult();
+    
+    
+    if (!resultadoValidaciones.IsValid)
     {
-        return Results.BadRequest("IdPropiedad incorrecto o nombre vacio");
+        return Results.BadRequest(resultadoValidaciones.Errors.FirstOrDefault().ToString());
     }
 
     //validacion si el nombre ya existe
