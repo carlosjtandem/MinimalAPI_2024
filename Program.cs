@@ -96,6 +96,39 @@ app.MapPost("/api/propiedades", async (IMapper _mapper, IValidator<CrearPropieda
 
 }).WithName("CrearPropiedad").Accepts<CrearPropiedadDto>("application/json").Produces<RespuestasAPI>(201).Produces<PropiedadDto>(400);
 
+
+//UPDATE propiedad
+app.MapPut("/api/propiedades", async (IMapper _mapper, IValidator<ActualizarPropiedadDto> _validacion, [FromBody] ActualizarPropiedadDto actualizarPropiedadDto) => // En vez de exponer el modelo se expone el DTO
+{
+    RespuestasAPI respuesta = new();
+
+    var resultadoValidaciones = await _validacion.ValidateAsync(actualizarPropiedadDto);
+
+    if (!resultadoValidaciones.IsValid)
+    {
+        respuesta.Errores.Add(resultadoValidaciones.Errors.FirstOrDefault().ToString());
+        return Results.BadRequest(respuesta);
+    }
+
+    //Obtener la propiedad 
+    Propiedad propiedadDesdeDB = DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.IdPropiedad == actualizarPropiedadDto.IdPropiedad);
+
+    propiedadDesdeDB.Nombre = actualizarPropiedadDto.Nombre;
+    propiedadDesdeDB.Descripcion = actualizarPropiedadDto.Descripcion;
+    propiedadDesdeDB.Ubicacion = actualizarPropiedadDto.Ubicacion;
+    propiedadDesdeDB.Activa = actualizarPropiedadDto.Activa;
+
+
+    respuesta.Resultado = _mapper.Map<PropiedadDto>(propiedadDesdeDB);
+    respuesta.Success = true;
+    respuesta.codigoEstado = HttpStatusCode.Created;
+
+    return Results.Ok(respuesta);
+
+}).WithName("ActualizarPropiedad").Accepts<ActualizarPropiedadDto>("application/json").Produces<RespuestasAPI>(201).Produces<PropiedadDto>(400);
+
+
+
 //
 app.UseHttpsRedirection();
 app.Run();
