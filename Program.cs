@@ -128,6 +128,29 @@ app.MapPut("/api/propiedades", async (IMapper _mapper, IValidator<ActualizarProp
 }).WithName("ActualizarPropiedad").Accepts<ActualizarPropiedadDto>("application/json").Produces<RespuestasAPI>(201).Produces<PropiedadDto>(400);
 
 
+//BORARR
+//GET  by id
+app.MapDelete("/api/propiedades/{id:int}", (int id) =>
+{
+    RespuestasAPI respuesta = new() { Success = false, codigoEstado = HttpStatusCode.BadRequest };
+
+    //Obtener el id de la propiedad a eliminar
+    Propiedad propiedadDesdeDB = DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.IdPropiedad == id);
+
+    if (propiedadDesdeDB != null)
+    {
+        DatosPropiedad.listaPropiedades.Remove(propiedadDesdeDB);
+        respuesta.Success = true;
+        respuesta.codigoEstado = HttpStatusCode.NoContent;
+        return Results.Ok(respuesta);
+    }
+    else
+    {
+        respuesta.Errores.Add("el id de la propiedad es invalido");
+        return Results.BadRequest(respuesta);
+
+    }
+});
 
 //
 app.UseHttpsRedirection();
