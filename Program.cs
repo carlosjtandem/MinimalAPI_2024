@@ -38,14 +38,16 @@ if (app.Environment.IsDevelopment())
 }
 
 //GET all
-app.MapGet("/api/propiedades", (ILogger<Program> logger) =>
+app.MapGet("/api/propiedades", async (ApplicationDBcontext _db, ILogger<Program> logger) =>
 {
     RespuestasAPI respuesta = new();
 
     //Usarr le _logger como inyeccion de dependencias
     logger.Log(LogLevel.Information, "Carga todas las propiedades - esto es Log por inyeccion de dependencias");
 
-    respuesta.Resultado = DatosPropiedad.listaPropiedades;
+    //respuesta.Resultado = DatosPropiedad.listaPropiedades;  // Antes cuando no se usaba DB, sino era con datos estaticos
+    respuesta.Resultado = _db.Propiedad;
+
     respuesta.Success = true;
     respuesta.codigoEstado = HttpStatusCode.OK;
 
@@ -53,10 +55,11 @@ app.MapGet("/api/propiedades", (ILogger<Program> logger) =>
 }).WithName("ObtenerPropiedades").Produces<RespuestasAPI>(200);
 
 //GET  by id
-app.MapGet("/api/propiedades/{id:int}", (int id) =>
+app.MapGet("/api/propiedades/{id:int}", async (ApplicationDBcontext _db, int id) =>
 {
     RespuestasAPI respuesta = new();
-    respuesta.Resultado = DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.IdPropiedad == id);
+    //respuesta.Resultado = DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.IdPropiedad == id);
+    respuesta.Resultado = await _db.Propiedad.FirstOrDefaultAsync(p => p.IdPropiedad == id);
     respuesta.Success = true;
     respuesta.codigoEstado = HttpStatusCode.OK;
 
@@ -64,7 +67,7 @@ app.MapGet("/api/propiedades/{id:int}", (int id) =>
 }).WithName("ObtenerPropiedad").Produces<RespuestasAPI>(200);
 
 //CREAR propiedad
-app.MapPost("/api/propiedades", async (IMapper _mapper, IValidator<CrearPropiedadDto> _validacion, [FromBody] CrearPropiedadDto crearPropiedadDto) => // En vez de exponer el modelo se expone el DTO
+app.MapPost("/api/propiedades", async (ApplicationDBcontext _db, IMapper _mapper, IValidator<CrearPropiedadDto> _validacion, [FromBody] CrearPropiedadDto crearPropiedadDto) => // En vez de exponer el modelo se expone el DTO
 {
     RespuestasAPI respuesta = new();
 
@@ -77,7 +80,7 @@ app.MapPost("/api/propiedades", async (IMapper _mapper, IValidator<CrearPropieda
     }
 
     //validacion si el nombre ya existe
-    if (DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.Nombre.ToLower() == crearPropiedadDto.Nombre.ToLower()) != null)
+    if (await _db.Propiedad.FirstOrDefaultAsync(p => p.Nombre.ToLower() == crearPropiedadDto.Nombre.ToLower()) != null)
     {
         respuesta.Errores.Add("El nombre ingresado ya existe");
         return Results.BadRequest(respuesta);
@@ -85,9 +88,11 @@ app.MapPost("/api/propiedades", async (IMapper _mapper, IValidator<CrearPropieda
 
     Propiedad propiedad = _mapper.Map<Propiedad>(crearPropiedadDto);
 
-    propiedad.IdPropiedad = DatosPropiedad.listaPropiedades.OrderByDescending(p => p.IdPropiedad).FirstOrDefault().IdPropiedad + 1;  // Obtiene el ultimo id y suma 1
+    //propiedad.IdPropiedad = DatosPropiedad.listaPropiedades.OrderByDescending(p => p.IdPropiedad).FirstOrDefault().IdPropiedad + 1;  // con DB ya no se necesita obtener el Id porque automaticamente lo crea
 
-    DatosPropiedad.listaPropiedades.Add(propiedad);
+    await _db.Propiedad.AddAsync(propiedad);
+    await _db.SaveChangesAsync();
+    //DatosPropiedad.listaPropiedades.Add(propiedad);
 
     PropiedadDto propiedadDto = _mapper.Map<PropiedadDto>(propiedad);
 
@@ -104,7 +109,7 @@ app.MapPost("/api/propiedades", async (IMapper _mapper, IValidator<CrearPropieda
 
 
 //UPDATE propiedad
-app.MapPut("/api/propiedades", async (IMapper _mapper, IValidator<ActualizarPropiedadDto> _validacion, [FromBody] ActualizarPropiedadDto actualizarPropiedadDto) => // En vez de exponer el modelo se expone el DTO
+app.MapPut("/api/propiedades", async (ApplicationDBcontext _db, IMapper _mapper, IValidator<ActualizarPropiedadDto> _validacion, [FromBody] ActualizarPropiedadDto actualizarPropiedadDto) => // En vez de exponer el modelo se expone el DTO
 {
     RespuestasAPI respuesta = new();
 
@@ -117,13 +122,15 @@ app.MapPut("/api/propiedades", async (IMapper _mapper, IValidator<ActualizarProp
     }
 
     //Obtener la propiedad 
-    Propiedad propiedadDesdeDB = DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.IdPropiedad == actualizarPropiedadDto.IdPropiedad);
+    //Propiedad propiedadDesdeDB = DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.IdPropiedad == actualizarPropiedadDto.IdPropiedad);
+    Propiedad propiedadDesdeDB = await _db.Propiedad.FirstOrDefaultAsync(p => p.IdPropiedad == actualizarPropiedadDto.IdPropiedad);
 
     propiedadDesdeDB.Nombre = actualizarPropiedadDto.Nombre;
     propiedadDesdeDB.Descripcion = actualizarPropiedadDto.Descripcion;
     propiedadDesdeDB.Ubicacion = actualizarPropiedadDto.Ubicacion;
     propiedadDesdeDB.Activa = actualizarPropiedadDto.Activa;
 
+    await _db.SaveChangesAsync();  // otra forma es db.updateDBAsync
 
     respuesta.Resultado = _mapper.Map<PropiedadDto>(propiedadDesdeDB);
     respuesta.Success = true;
@@ -136,16 +143,17 @@ app.MapPut("/api/propiedades", async (IMapper _mapper, IValidator<ActualizarProp
 
 //BORARR
 //GET  by id
-app.MapDelete("/api/propiedades/{id:int}", (int id) =>
+app.MapDelete("/api/propiedades/{id:int}", async (ApplicationDBcontext _db, int id) =>
 {
     RespuestasAPI respuesta = new() { Success = false, codigoEstado = HttpStatusCode.BadRequest };
 
     //Obtener el id de la propiedad a eliminar
-    Propiedad propiedadDesdeDB = DatosPropiedad.listaPropiedades.FirstOrDefault(p => p.IdPropiedad == id);
+    Propiedad propiedadDesdeDB = await _db.Propiedad.FirstOrDefaultAsync(p => p.IdPropiedad == id);
 
     if (propiedadDesdeDB != null)
     {
-        DatosPropiedad.listaPropiedades.Remove(propiedadDesdeDB);
+        _db.Propiedad.Remove(propiedadDesdeDB);
+        await _db.SaveChangesAsync();
         respuesta.Success = true;
         respuesta.codigoEstado = HttpStatusCode.NoContent;
         return Results.Ok(respuesta);
